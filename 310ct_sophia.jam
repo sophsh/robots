@@ -1,0 +1,710 @@
+//top level goals
+GOALS:
+	ACHIEVE main;
+
+//world model	
+FACTS:
+	FACT robotA 0 0;
+	FACT stepA 0;
+	FACT pointA 0;
+	FACT robotB 7 0;
+	FACT stepB 0;
+	FACT pointB 0;
+	
+	FACT monster 6 0;
+	FACT monster 2 1;
+	FACT monster 1 2;
+	FACT monster 0 3;
+	FACT monster 4 4;
+	FACT monster 1 5;
+	
+	FACT weapon 1 1;
+	FACT weapon 4 3;
+	FACT weapon 2 4;
+	FACT weapon 5 4;
+	FACT weapon 7 5;
+	FACT weapon 6 6;
+	
+	FACT weaponA 1;
+	FACT weaponB 1;
+	
+	FACT monsterA 1;
+	FACT monsterB 1;
+	
+	FACT reward 4 2;
+	FACT reward 7 3;
+	FACT reward 5 5;
+	FACT reward 4 6;
+	
+	FACT gridCleared 0;
+	FACT monsterCleared "false";
+	FACT weaponCleared "false";
+	FACT rewardCleared "false";
+
+
+
+//main
+PLAN: {
+NAME:
+	"main plan"
+
+DOCUMENTATION:
+	"runs all the plans for robots to complete tasks within the grid."
+	
+GOAL:
+	ACHIEVE main;
+	
+BODY:
+	RETRIEVE robotA $ax $ay;
+	RETRIEVE robotB $bx $by;
+	RETRIEVE gridCleared $cleared;
+	RETRIEVE stepA $countA;
+	RETRIEVE stepB $countB;
+	EXECUTE println "";
+	
+	PERFORM checkReward;
+	PERFORM checkWeapon;
+	PERFORM checkMonster;
+	
+	EXECUTE println "\nRobot A starts at ("$ax", "$ay")";
+	EXECUTE println "Robot B starts at ("$bx", "$by") \n";
+	
+	//loop robots until grid tasks are completed 
+	WHILE: TEST (!= $cleared 3) {
+		DO_ANY {
+			PERFORM move "robotA";
+			PERFORM collectWeapon "robotA";
+			PERFORM killMonster "robotA";
+			PERFORM collectReward "robotA";	
+			
+			RETRIEVE stepA $countA;
+			UPDATE (stepA) (stepA (+ $countA 1));
+			
+			RETRIEVE gridCleared $cleared;
+		}
+		{
+			PERFORM move "robotB";
+			PERFORM collectWeapon "robotB";
+			PERFORM killMonster "robotB";
+			PERFORM collectReward "robotB";	
+
+			RETRIEVE stepB $countB;
+			UPDATE (stepB) (stepB (+ $countB 1));	
+			
+			RETRIEVE gridCleared $cleared;
+		};
+	};
+	
+	//robots will head to exit when grid tasks are completed
+	WHEN: TEST (== $cleared 3) {
+		RETRIEVE stepA $countA;
+		RETRIEVE stepB $countB;
+		RETRIEVE pointA $totalA;
+		RETRIEVE pointB $totalB;
+		
+		EXECUTE println "##########################################";
+		EXECUTE println "TASKS SUMMARY ROBOT A";
+		EXECUTE println "Total steps taken to complete tasks: " $countA;
+		EXECUTE println "Total points earned: " $totalA;
+		EXECUTE println "";
+		
+		EXECUTE println "TASKS SUMMARY ROBOT B";
+		EXECUTE println "Total steps taken to complete tasks: " $countB;
+		EXECUTE println "Total points earned: " $totalB;
+		EXECUTE println "";
+		
+		EXECUTE println "No more tasks available in the grid.";
+		EXECUTE println "Robots will perform exit sequence now. \n ";
+	
+		PERFORM exit "robotA";
+		PERFORM exit "robotB";
+		
+		EXECUTE println "";
+		EXECUTE println "Both robots have successfully exited the grid.";
+	};
+
+}
+
+
+
+//move robots
+PLAN: {
+NAME:
+	"robot movement"
+	
+DOCUMENTATION:
+	"move robot A and robot B in a 
+	- random direction, 
+	- display the direction taken."
+	
+GOAL:
+	ACHIEVE move $robot;
+	
+BODY:
+	WHEN: TEST(== $robot "robotA") {
+		RETRIEVE robotA $x $y;
+		RETRIEVE weaponA $hasA;
+		RETRIEVEALL $FACTS monster $mx $my;
+			
+		DO_ANY {
+			//Move Left A
+			WHEN: TEST(> $x 0) {
+				DO {
+					RETRIEVE robotA $x $y;
+					UPDATE (robotA) (robotA (- $x 1) $y);
+					RETRIEVE robotA $x $y;
+					EXECUTE println "Robot A moves left to (" $x ", " $y ")";
+				} WHILE: TEST (== $x (- $x 1));		
+			};
+			
+			//retreat right A
+			WHEN: TEST(<= $hasA 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot A encountered a monster while defenseless!";
+						UPDATE (robotA) (robotA (+ $x 1) $y);
+						RETRIEVE robotA $x $y;
+						EXECUTE println "Robot A retreated right to: (" $x ", " $y ")\n";
+					};
+				};
+			};
+		}
+		{
+			//Move Up A
+			WHEN: TEST(< $y 6) {
+				DO {
+					UPDATE (robotA) (robotA $x (+ $y 1));
+					RETRIEVE robotA $x $y;
+					EXECUTE println "Robot A moves up to (" $x ", " $y ")";
+				}WHILE: TEST (== $y (+ $y 1));		
+			};
+
+			//retreat down A
+			WHEN: TEST(<= $hasA 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot A encountered a monster while defenseless!";
+						UPDATE (robotA) (robotA $x (- $y 1));
+						RETRIEVE robotA $x $y;
+						EXECUTE println "Robot A retreated down to: (" $x ", " $y ")\n";
+					};
+				};
+			};	
+		}
+		{
+			//Move Right A
+			WHEN: TEST(< $x 7){
+				DO{
+					UPDATE (robotA) (robotA (+ $x 1) $y);
+					RETRIEVE robotA $x $y;
+					EXECUTE println "Robot A moves right to (" $x ", " $y ")";
+				}WHILE: TEST (== $x (+ $x 1));		
+			};
+			
+			//retreat left A
+			WHEN: TEST(<= $hasA 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot A encountered a monster while defenseless!";
+						UPDATE (robotA) (robotA (- $x 1) $y);
+						RETRIEVE robotA $x $y;
+						EXECUTE println "Robot A retreated down to: (" $x ", " $y ")\n";
+					};
+				};
+			};	
+		}
+		{
+			//Move Down A
+			WHEN: TEST(> $y 0){
+				DO{
+					UPDATE (robotA) (robotA $x (- $y 1));
+					RETRIEVE robotA $x $y;
+					EXECUTE println "Robot A moves down to (" $x ", " $y ")";
+				}WHILE: TEST (== $y (- $y 1));	
+			};
+			
+			//retreat up A
+			WHEN: TEST(<= $hasA 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot A encountered a monster while defenseless!";
+						UPDATE (robotA)(robotA $x (+ $y 1));
+						RETRIEVE robotA $x $y;
+						EXECUTE println "Robot A retreated up to: (" $x ", " $y ")\n";
+					};
+				};
+			};
+		};		
+	};
+
+	WHEN: TEST(== $robot "robotB") {
+		RETRIEVE robotB $x $y;
+		RETRIEVE weaponB $hasB;
+		RETRIEVEALL $FACTS monster $mx $my;
+		
+		DO_ANY {
+			//Move Left B
+			WHEN: TEST(> $x 0) {
+				DO {
+					RETRIEVE robotB $x $y;
+					UPDATE (robotB) (robotB (- $x 1) $y);
+					RETRIEVE robotB $x $y;
+					EXECUTE println "Robot B moves left to (" $x ", " $y ")";
+				} WHILE: TEST (== $x (- $x 1));		
+			};
+			
+			//retreat right B
+			WHEN: TEST(<= $hasB 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot B encountered a monster while defenseless!";
+						UPDATE (robotB) (robotB (+ $x 1) $y);
+						RETRIEVE robotB $x $y;
+						EXECUTE println "Robot B retreated right to: (" $x ", " $y ")\n";
+					};
+				};
+			};
+		}
+		{
+			//Move Up B
+			WHEN: TEST(< $y 6) {
+				DO {
+					UPDATE (robotB) (robotB $x (+ $y 1));
+					RETRIEVE robotB $x $y;
+					EXECUTE println "Robot B moves up to (" $x ", " $y ")";
+				}WHILE: TEST (== $y (+ $y 1));		
+			};
+			
+			
+			//retreat down B
+			WHEN: TEST(<= $hasB 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot B encountered a monster while defenseless!";
+						UPDATE (robotB) (robotB $x (- $y 1));
+						RETRIEVE robotB $x $y;
+						EXECUTE println "Robot B retreated down to: (" $x ", " $y ")\n";
+					};
+				};
+			};	
+		}
+		{
+			//Move Right B
+			WHEN: TEST(< $x 7){
+				DO{
+					UPDATE (robotB) (robotB (+ $x 1) $y);
+					RETRIEVE robotB $x $y;
+					EXECUTE println "Robot B moves right to (" $x ", " $y ")";
+				}WHILE: TEST (== $x (+ $x 1));		
+			};
+			
+			//retreat left B
+			WHEN: TEST(<= $hasB 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot B encountered a monster while defenseless!";
+						UPDATE (robotB) (robotB (- $x 1) $y);
+						RETRIEVE robotB $x $y;
+						EXECUTE println "Robot B retreated down to: (" $x ", " $y ")\n";
+					};
+				};
+			};	
+		}
+		{
+			//Move Down B
+			WHEN: TEST(> $y 0){
+				DO{
+					UPDATE (robotB) (robotB $x (- $y 1));
+					RETRIEVE robotB $x $y;
+					EXECUTE println "Robot B moves down to (" $x ", " $y ")";
+				}WHILE: TEST (== $y (- $y 1));	
+			};
+			
+			//retreat up B
+			WHEN: TEST(<= $hasB 1) {
+				WHILE: NEXTFACT $FACTS monster $mx $my {
+					WHEN: TEST(&& (== $mx $x) (== $my $y)) {
+						EXECUTE println "Robot B encountered a monster while defenseless!";
+						UPDATE (robotB)(robotB $x (+ $y 1));
+						RETRIEVE robotB $x $y;
+						EXECUTE println "Robot B retreated up to: (" $x ", " $y ")\n";
+					};
+				};
+			};
+		};
+	};
+}
+
+
+
+PLAN: {
+NAME: 	
+	"exit sequence"
+
+DOCUMENTATION:
+	"guide robots to the exit once all the grid tasks are completed."
+
+GOAL:
+	ACHIEVE exit $robot;
+	
+BODY:
+	WHEN: TEST(== $robot "robotA") {
+	
+		DO {
+			RETRIEVE robotA $x $y;
+			
+			//Move Right A
+			WHEN: TEST(< $x 7) {
+				DO{
+					UPDATE (robotA) (robotA (+ $x 1) $y);
+					RETRIEVE robotA $x $y;
+					EXECUTE println "Robot A moves right to (" $x ", " $y ")";
+				}WHILE: TEST (< $x 7);	
+			};
+				
+			//Move Up A
+			WHEN: TEST(< $y 6) {
+				DO {
+					UPDATE (robotA) (robotA $x (+ $y 1));
+					RETRIEVE robotA $x $y;
+					EXECUTE println "Robot A moves up to (" $x ", " $y ")";
+				}WHILE: TEST (< $y 6);
+			};
+		} WHILE: TEST(&&(!= $x 7)(!= $y 6));
+
+		EXECUTE println "\nRobot A has successfully exited the grid.";
+		EXECUTE println "";
+
+	};
+
+	WHEN: TEST(== $robot "robotB") {
+
+		DO {
+			RETRIEVE robotB $x $y;
+
+			//Move Right B
+			WHEN: TEST(< $x 7) {
+				DO{
+					UPDATE (robotB) (robotB (+ $x 1) $y);
+					RETRIEVE robotB $x $y;
+					EXECUTE println "Robot B moves right to (" $x ", " $y ")";
+				}WHILE: TEST (< $x 7);	
+			};
+			
+			//Move Up B
+			WHEN: TEST(< $y 6) {
+				DO {
+					UPDATE (robotB) (robotB $x (+ $y 1));
+					RETRIEVE robotB $x $y;
+					EXECUTE println "Robot B moves up to (" $x ", " $y ")";
+				}WHILE: TEST (< $y 6);
+			};
+			
+			
+		} WHILE: TEST(&&(!= $x 7)(!= $y 6));
+
+		EXECUTE println "\nRobot B has successfully exited the grid.";
+
+	};
+	
+}
+
+
+
+//collect rewards
+PLAN: {
+NAME:
+	"collect rewards"
+
+DOCUMENTATION:
+	"check and collect rewards"
+
+GOAL:
+	ACHIEVE collectReward $robot;
+
+BODY:
+	RETRIEVE pointA $totalA;
+	RETRIEVE pointB $totalB;
+	RETRIEVEALL $FACTS reward $x $y;
+	
+	WHEN: TEST(== $robot "robotA") {
+		RETRIEVE robotA $rx $ry;
+		
+		WHILE: NEXTFACT $FACTS reward $x $y {
+			WHEN: TEST(&& (== $x $rx) (== $y $ry)) {
+				RETRACT reward $x $y;
+				EXECUTE println "\nRobot A: reward collected at (" $x ", " $y ")";
+				PERFORM checkReward;
+				
+				RETRIEVE pointA $totalA;
+				UPDATE (pointA) (pointA (+ $totalA 1));
+				EXECUTE println "Robot A points: " (+ $totalA 1);
+				EXECUTE println "";
+			};
+		};
+	};
+
+	WHEN: TEST(== $robot "robotB") {
+		RETRIEVE robotB $rx $ry;
+		
+		WHILE: NEXTFACT $FACTS reward $x $y {
+			WHEN: TEST(&& (== $x $rx) (== $y $ry)) {
+				RETRACT reward $x $y;
+				EXECUTE println "\nRobot B: reward collected at (" $x ", " $y ")";
+				PERFORM checkReward;
+				
+				RETRIEVE pointB $totalB;
+				UPDATE (pointB) (pointB (+ $totalB 1));
+				EXECUTE println "Robot B points: " (+ $totalB 1);
+				EXECUTE println "";
+			};
+		};
+	};
+
+FAILURE:
+	EXECUTE println "failed to collect reward";
+}
+
+
+
+//collect weapons
+PLAN: {
+NAME:
+	"collect weapons"
+
+DOCUMENTATION:
+	"collect weapons,
+	weapon counter"
+
+GOAL:
+	ACHIEVE collectWeapon $robot;
+
+BODY:
+	RETRIEVEALL $FACTS weapon $x $y;
+	RETRIEVE weaponA $hasA;
+	RETRIEVE weaponB $hasB;
+	
+	WHEN: TEST(== $robot "robotA") {
+		RETRIEVE robotA $rx $ry;
+		
+		WHILE: NEXTFACT $FACTS weapon $x $y {
+			WHEN: TEST(&& (== $x $rx) (== $y $ry)) {
+				RETRACT weapon $x $y;
+				EXECUTE println "\nRobot A: weapon collected at (" $x ", " $y ")";
+				
+				UPDATE (weaponA) (weaponA (+ $hasA 1));
+				EXECUTE println "Robot A currently has " $hasA " weapon(s)";
+				
+				PERFORM checkWeapon;
+				PERFORM checkMonster;
+				
+				EXECUTE println "";
+			};
+		};
+	};
+
+	WHEN: TEST(== $robot "robotB") {
+		RETRIEVE robotB $rx $ry;
+		
+		WHILE: NEXTFACT $FACTS weapon $x $y {
+			WHEN: TEST(&& (== $x $rx) (== $y $ry)) {
+				RETRACT weapon $x $y;
+				EXECUTE println "\nRobot B: weapon collected at (" $x ", " $y ")";
+				
+				UPDATE (weaponB) (weaponB (+ $hasB 1));
+				EXECUTE println "Robot B currently has " $hasB " weapon(s)";
+				
+				PERFORM checkWeapon;
+				PERFORM checkMonster;
+				
+				EXECUTE println "";
+			};
+		};
+	};
+
+FAILURE:
+	EXECUTE println "failed to collect weapon";
+}
+
+
+
+//fight monsters
+PLAN: {
+NAME:
+	"kill monsters"
+
+DOCUMENTATION:
+	"kill monsters, 
+	kill counter, 
+	update weapon counter"
+
+GOAL:
+	ACHIEVE killMonster $robot;
+
+BODY:
+	RETRIEVEALL $FACTS monster $x $y;
+	RETRIEVE monsterA $killA;
+	RETRIEVE monsterB $killB;
+	RETRIEVE weaponA $hasA;
+	RETRIEVE weaponB $hasB;
+	RETRIEVE pointA $totalA;
+	RETRIEVE pointB $totalB;
+	
+	
+	WHEN: TEST(== $robot "robotA") {
+		RETRIEVE robotA $rx $ry;
+		
+		WHILE: NEXTFACT $FACTS monster $x $y {
+			WHEN: TEST(&& (== $x $rx) (== $y $ry)) {
+				WHEN: TEST(> $hasA 1) {
+					RETRACT monster $x $y;
+					EXECUTE println "\nRobot A: monster killed at (" $x ", " $y ")";
+					
+					UPDATE (monsterA) (monsterA (+ $killA 1));
+					EXECUTE println "Robot A has killed " $killA " monster(s)";
+					
+					UPDATE (weaponA) (weaponA (- $hasA 1));
+					PERFORM checkMonster;
+					
+					RETRIEVE pointA $totalA;
+					UPDATE (pointA) (pointA (+ $totalA 2));
+					EXECUTE println "Robot A points: " (+ $totalA 2);
+					
+					EXECUTE println "";
+				};
+			};
+		};
+		
+	};
+
+	WHEN: TEST(== $robot "robotB") {
+		RETRIEVE robotB $rx $ry;
+		
+		WHILE: NEXTFACT $FACTS monster $x $y {
+			WHEN: TEST(&& (== $x $rx) (== $y $ry)) {
+				WHEN: TEST(> $hasB 1) {
+					RETRACT monster $x $y;
+					EXECUTE println "\nRobot B: monster killed at (" $x ", " $y ")";
+					
+					UPDATE (monsterB) (monsterB (+ $killB 1));
+					EXECUTE println "Robot B has killed " $killB " monster(s)";
+					
+					UPDATE (weaponB) (weaponB (- $hasB 1));
+					PERFORM checkMonster;
+					
+					RETRIEVE pointB $totalB;
+					UPDATE (pointB) (pointB (+ $totalB 2));
+					EXECUTE println "Robot B points: " (+ $totalB 2);
+					
+					EXECUTE println "";
+				};
+			};
+		};
+	};
+
+FAILURE:
+	EXECUTE println "failed to kill monster";
+}
+
+
+
+//check rewards
+PLAN: {
+NAME:
+	"check rewards"
+
+DOCUMENTATION:
+	"check the grid for rewards"
+	
+GOAL:
+	ACHIEVE checkReward;
+	
+BODY:
+	ASSIGN $rewardCount 0;
+	RETRIEVEALL $FACTS reward $rx $ry;
+	RETRIEVE rewardCleared $cleared;
+	RETRIEVE gridCleared $done;
+
+	WHILE: NEXTFACT $FACTS reward $rx $ry {
+		ASSIGN $rewardCount (+ $rewardCount 1);
+	};
+	
+	EXECUTE println "Remaining available rewards (1 point): " $rewardCount;
+	
+	WHEN: TEST(== $rewardCount 0) {
+		UPDATE (rewardCleared) (rewardCleared "true");
+		UPDATE (gridCleared) (gridCleared (+ $done 1));
+		EXECUTE println "***No more available rewards!";	
+	};
+	
+FAILURE:
+	EXECUTE println "Failed to check for available reward";
+}
+
+
+//check weapons
+PLAN: {
+NAME:
+	"check weapons"
+
+DOCUMENTATION:
+	"check the grid for weapons"
+	
+GOAL:
+	ACHIEVE checkWeapon;
+	
+BODY:
+	ASSIGN $weaponCount 0;
+	RETRIEVEALL $FACTS weapon $wx $wy;
+	RETRIEVE weaponCleared $cleared;
+	RETRIEVE gridCleared $done;
+
+	WHILE: NEXTFACT $FACTS weapon $wx $wy {
+		ASSIGN $weaponCount (+ $weaponCount 1);
+	};
+	
+	EXECUTE println "Remaining available weapons: " $weaponCount;
+	
+	WHEN: TEST(== $weaponCount 0) {
+		UPDATE (weaponCleared) (weaponCleared "true");
+		UPDATE (gridCleared) (gridCleared (+ $done 1));
+		EXECUTE println "***No more available weapons!";	
+	};
+	
+FAILURE:
+	EXECUTE println "Failed to check for available weapon";
+}
+
+
+//check monsters
+PLAN: {
+NAME:
+	"check monsters"
+
+DOCUMENTATION:
+	"check the grid for monsters"
+	
+GOAL:
+	ACHIEVE checkMonster;
+	
+BODY:
+	ASSIGN $monsterCount 0;
+	RETRIEVEALL $FACTS monster $mx $my;
+	RETRIEVE monsterCleared $cleared;
+	RETRIEVE gridCleared $done;
+
+	WHILE: NEXTFACT $FACTS monster $mx $my {
+		ASSIGN $monsterCount (+ $monsterCount 1);
+	};
+	
+	EXECUTE println "Remaining monsters (2 points): " $monsterCount;
+	
+	WHEN: TEST(== $monsterCount 0) {
+		UPDATE (monsterCleared) (monsterCleared "true");
+		UPDATE (gridCleared) (gridCleared (+ $done 1));
+		EXECUTE println "***No more monsters!";
+	};
+	
+FAILURE:
+	EXECUTE println "Failed to check for available monsters";
+}
